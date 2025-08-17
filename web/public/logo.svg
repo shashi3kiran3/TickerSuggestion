@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="150" viewBox="0 0 500 150" fill="none">
+  <!-- Icon -->
+  <g>
+    <path d="M40 100 L80 60 L100 80 L140 40" stroke="url(#grad)" stroke-width="8" fill="none"/>
+    <polygon points="140,40 150,50 130,50" fill="url(#grad)"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="170" y="70" font-family="Arial, Helvetica, sans-serif" font-size="40" fill="white" font-weight="bold">
+    SHASHI
+  </text>
+  
+  <!-- Tagline -->
+  <text x="170" y="105" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="rgba(255,255,255,0.3)">
+    Smart Hub for Analytics, Stocks, Hedging & Insights
+  </text>
+
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0066ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00ccff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

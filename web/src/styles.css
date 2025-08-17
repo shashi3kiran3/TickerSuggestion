@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Global layer for any overrides */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #060b1a;
+  color: rgba(243, 244, 246, 1);
+}
+
+.container-page {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 80rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .container-page { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .container-page { padding-left: 2rem; padding-right: 2rem; }
+}
+
+
