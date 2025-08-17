@@ -11,13 +11,20 @@ npm run dev
 
 ## Env vars
 
-Create `.env` with:
+For local OpenAI access (optional), create `.env` with:
 
 ```
 VITE_OPENAI_API_KEY=sk-...
 ```
 
 If not provided, Ask AI returns a safe dummy response.
+
+Cloudflare Pages deployment
+- Project settings → Functions → Environment variables:
+  - `OPENAI_API_KEY` = your key (server-side)
+- Build command: `npm ci && npm run build`
+- Build directory: `web/dist`
+- Functions directory: `web/functions`
 
 ## Scripts
 

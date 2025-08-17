@@ -16,16 +16,11 @@ export async function askOpenAI(prompt: string): Promise<string> {
   }
 
   // Step 2: call OpenAI (or fallback)
-  const apiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY
-  if (!apiKey) return localAnswer(prompt, top, bodies)
-
+  // Prefer Cloudflare function proxy to keep key server-side
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('/api/ai', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
@@ -34,10 +29,7 @@ export async function askOpenAI(prompt: string): Promise<string> {
             content:
               'You are a finance assistant. Only answer stock/news/event questions. Use sources given. Provide concise, timely bullets and include 3-5 cited links at the end. If query is out of scope, ask to refine.',
           },
-          {
-            role: 'user',
-            content: buildPrompt(prompt, top, bodies),
-          },
+          { role: 'user', content: buildPrompt(prompt, top, bodies) },
         ],
         temperature: 0.3,
       }),
@@ -85,7 +77,6 @@ Sources:\n${refs.join('\n')}`
 export type NewsSummary = { headline: string; bullets: string[] }
 
 export async function summarizeNewsArticle(title: string, url: string): Promise<NewsSummary> {
-  const apiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY
   let body = ''
   try {
     body = await fetchArticleText(url)
@@ -93,20 +84,10 @@ export async function summarizeNewsArticle(title: string, url: string): Promise<
     // ignore; proceed with title-only
   }
 
-  if (!apiKey) {
-    return {
-      headline: simpleHeadline(title),
-      bullets: ['Open the source to read the full article.'],
-    }
-  }
-
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('/api/ai', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         response_format: { type: 'json_object' },
