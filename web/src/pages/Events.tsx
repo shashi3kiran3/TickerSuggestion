@@ -21,6 +21,7 @@ export default function Events() {
 
   return (
     <div className="space-y-5">
+      <div className="text-2xl font-bold text-red-400">In Progress</div>
       <div className="flex flex-wrap gap-2">
         {types.map((t) => (
           <button

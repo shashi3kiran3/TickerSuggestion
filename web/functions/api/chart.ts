@@ -1,0 +1,3 @@
+export { onRequestGet } from '../chart'
+
+

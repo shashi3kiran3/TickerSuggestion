@@ -26,6 +26,7 @@ export default function News() {
 
   return (
     <div className="space-y-5">
+      <div className="text-2xl font-bold text-red-400">In Progress</div>
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={q}
