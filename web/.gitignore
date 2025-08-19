@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 web/.dev.vars
+web/.dev.vars
