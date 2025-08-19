@@ -98,7 +98,7 @@ export async function summarizeNewsArticle(title: string, url: string, hint?: st
           {
             role: 'system',
             content:
-              'You are a finance news summarizer. Output JSON {"headline": string, "bullets": string[]}.\nHeadline: concise and neutral.\nBullets: 3–10 bullets, each ~20–40 words. Cover: (1) what happened, (2) drivers/why, (3) key numbers (%, $, guidance), (4) companies/tickers, (5) timeframes (today/this week/next quarter), (6) immediate market reaction, (7) risks/uncertainties.\nPlain language. No hype, no emojis, no CDATA. Do not include boilerplate or disclaimers.',
+              'You are a finance news summarizer. Output JSON {"headline": string, "bullets": string[]}.\nHeadline: concise and neutral.\nBullets: 3–8 bullets, each ~12–25 words. Cover: (1) what happened, (2) key numbers (%, $, guidance), (3) companies/tickers, (4) timeframe, (5) immediate reaction/risks.\nPlain language. No hype, no emojis, no CDATA. No boilerplate.',
           },
           {
             role: 'user',
@@ -126,11 +126,9 @@ export async function summarizeNewsArticle(title: string, url: string, hint?: st
     const parsed = JSON.parse(text)
     const headline = typeof parsed.headline === 'string' ? parsed.headline : simpleHeadline(title)
     const aiBullets: string[] = Array.isArray(parsed.bullets) ? parsed.bullets : []
-    let bullets = aiBullets.slice(0, 10)
-    if (bullets.length < 3) {
-      bullets = [...bullets, ...naiveBullets(body)].slice(0, 10)
-    }
-    if (bullets.length < 3) bullets = naiveBullets(body)
+    let bullets = limitBullets(aiBullets)
+    if (bullets.length < 3) bullets = limitBullets([...bullets, ...naiveBullets(body)])
+    if (bullets.length < 3) bullets = limitBullets(naiveBullets(body))
     return { headline, bullets }
   } catch {
     const bullets = naiveBullets(body)
@@ -173,6 +171,16 @@ function naiveBullets(text: string): string[] {
     .map((x) => x.s)
 
   return top.length > 0 ? top : sentences.slice(0, 6)
+}
+
+function limitBullets(arr: string[]): string[] {
+  // Ensure 3–10 bullets; trim very long lines to encourage brevity without cutting words awkwardly
+  const cleaned = arr
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter((s) => s.length > 0)
+  let out = cleaned.slice(0, 10)
+  if (out.length > 10) out = out.slice(0, 10)
+  return out
 }
 
 
