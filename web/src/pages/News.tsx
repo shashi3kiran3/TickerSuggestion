@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchLiveNews, type NewsCard, timeAgo } from '../services/news'
+import { type NewsCard, timeAgo } from '../services/news'
 import { summarizeNewsArticle, type NewsSummary } from '../services/openai'
 
 export default function News() {
@@ -9,25 +9,62 @@ export default function News() {
   const [loading, setLoading] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<Record<string, NewsSummary | 'loading'>>({})
+  const [visible, setVisible] = useState(5)
+  const [auto, setAuto] = useState(true)
 
-  useEffect(() => {
+  function loadNews() {
     setLoading(true)
-    fetchLiveNews()
+    const params = new URLSearchParams()
+    params.set('page', '1')
+    params.set('pageSize', '50')
+    if (source && source !== 'All') params.set('source', source)
+    if (q.trim()) params.set('q', q.trim())
+    fetch(`/api/news?${params.toString()}`)
+      .then((r) => r.json())
+      .then((d) => (Array.isArray(d.items) ? d.items : []))
       .then(setAll)
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadNews()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const sources = useMemo(() => ['All', ...Array.from(new Set(all.map((a) => a.source)))], [all])
   const filtered = useMemo(() => {
     const bySource = source === 'All' ? all : all.filter((a) => a.source === source)
     const query = q.trim().toLowerCase()
-    return query ? bySource.filter((a) => a.title.toLowerCase().includes(query)) : bySource
+    const filtered = query ? bySource.filter((a) => a.title.toLowerCase().includes(query)) : bySource
+    return filtered
   }, [all, q, source])
+
+  // Auto-incrementally reveal 5 at a time while loading or until all visible
+  useEffect(() => {
+    if (!auto) return
+    if (visible >= filtered.length) return
+    const id = setInterval(() => {
+      setVisible((v) => {
+        const next = Math.min(v + 5, filtered.length)
+        if (next >= filtered.length) setAuto(false)
+        return next
+      })
+    }, 800)
+    return () => clearInterval(id)
+  }, [auto, filtered.length, visible])
 
   return (
     <div className="space-y-5">
       <div className="text-2xl font-bold text-red-400">In Progress</div>
-      <div className="flex flex-wrap items-center gap-3">
+      <form
+        className="flex flex-wrap items-center gap-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          setVisible(5)
+          setAuto(true)
+          loadNews()
+        }}
+      >
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -43,13 +80,19 @@ export default function News() {
             <option key={c}>{c}</option>
           ))}
         </select>
-      </div>
+        <button
+          type="submit"
+          className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-gray-200 hover:bg-white/20"
+        >
+          Search
+        </button>
+      </form>
 
       {loading ? (
         <div className="text-sm text-gray-300">Loading latest finance headlines…</div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((a) => (
+          {filtered.slice(0, visible).map((a) => (
             <div
               key={a.id}
               className="rounded-2xl border border-white/10 bg-white/5 p-5 hover:bg-white/7.5 transition"
@@ -60,7 +103,7 @@ export default function News() {
                   setOpenId((id) => (id === a.id ? null : a.id))
                   if (!summaries[a.id]) {
                     setSummaries((s) => ({ ...s, [a.id]: 'loading' }))
-                    const sum = await summarizeNewsArticle(a.title, a.url)
+                    const sum = await summarizeNewsArticle(a.title, a.url, (a as any).description)
                     setSummaries((s) => ({ ...s, [a.id]: sum }))
                   }
                 }}
@@ -96,6 +139,16 @@ export default function News() {
               )}
             </div>
           ))}
+          {visible < filtered.length && (
+            <div className="pt-2">
+              <button
+                onClick={() => setVisible((v) => v + 5)}
+                className="w-full rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-gray-200 hover:bg-white/20"
+              >
+                Load more
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

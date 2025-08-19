@@ -4,6 +4,7 @@ export type NewsCard = {
   url: string
   source: string
   publishedAt?: string
+  description?: string
 }
 
 const allOrigins = (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
@@ -82,6 +83,12 @@ export function timeAgo(iso?: string): string {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
+}
+
+// Heuristic filter: keep stock-market-focused headlines only
+export function filterStockMarket(items: NewsCard[]): NewsCard[] {
+  const re = /(stock|stocks|share|shares|earnings|guidance|upgrade|downgrade|price target|pre[- ]?market|after[- ]?hours|Nasdaq|S&P|Dow|IPO|dividend|buyback)/i
+  return items.filter((n) => re.test(n.title || ''))
 }
 
 

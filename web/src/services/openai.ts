@@ -76,10 +76,13 @@ Sources:\n${refs.join('\n')}`
 
 export type NewsSummary = { headline: string; bullets: string[] }
 
-export async function summarizeNewsArticle(title: string, url: string): Promise<NewsSummary> {
-  let body = ''
+export async function summarizeNewsArticle(title: string, url: string, hint?: string): Promise<NewsSummary> {
+  let body = hint ? (hint + '\n\n') : ''
   try {
-    body = await fetchArticleText(url)
+    if (!body) {
+      const resp = await fetch(`/api/read?url=${encodeURIComponent(url)}`)
+      if (resp.ok) body = await resp.text()
+    }
   } catch {
     // ignore; proceed with title-only
   }
@@ -95,25 +98,43 @@ export async function summarizeNewsArticle(title: string, url: string): Promise<
           {
             role: 'system',
             content:
-              'You are a finance news summarizer. Produce a very short, plain headline and 3-5 simple bullets an everyday investor can grasp. Avoid hype. Return JSON with keys: headline, bullets.',
+              'You are a finance news summarizer. Output JSON {"headline": string, "bullets": string[]}.\nHeadline: concise and neutral.\nBullets: 3–10 bullets, each ~20–40 words. Cover: (1) what happened, (2) drivers/why, (3) key numbers (%, $, guidance), (4) companies/tickers, (5) timeframes (today/this week/next quarter), (6) immediate market reaction, (7) risks/uncertainties.\nPlain language. No hype, no emojis, no CDATA. Do not include boilerplate or disclaimers.',
           },
           {
             role: 'user',
-            content: `Title: ${title}\nURL: ${url}\n\nContent:\n${body.slice(0, 6000)}`,
+            content: `Title: ${title}\nURL: ${url}\n\nContent (may be partial, use what is available):\n${body.slice(0, 12000)}`,
           },
         ],
-        temperature: 0.2,
+        temperature: 0.15,
+        max_tokens: 700,
       }),
     })
-    if (!response.ok) throw new Error('bad response')
+    if (!response.ok) {
+      // Try to detect quota/auth errors and fallback gracefully
+      try {
+        const err = await response.json()
+        const code = err?.error?.code || err?.code
+        if (code === 'insufficient_quota' || response.status === 401 || response.status === 429) {
+          const bullets = naiveBullets(body)
+          return { headline: simpleHeadline(title), bullets }
+        }
+      } catch {}
+      throw new Error('bad response')
+    }
     const data = await response.json()
     const text = data?.choices?.[0]?.message?.content || '{}'
     const parsed = JSON.parse(text)
     const headline = typeof parsed.headline === 'string' ? parsed.headline : simpleHeadline(title)
-    const bullets: string[] = Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 5) : []
+    const aiBullets: string[] = Array.isArray(parsed.bullets) ? parsed.bullets : []
+    let bullets = aiBullets.slice(0, 10)
+    if (bullets.length < 3) {
+      bullets = [...bullets, ...naiveBullets(body)].slice(0, 10)
+    }
+    if (bullets.length < 3) bullets = naiveBullets(body)
     return { headline, bullets }
   } catch {
-    return { headline: simpleHeadline(title), bullets: ['Open the source to read details.'] }
+    const bullets = naiveBullets(body)
+    return { headline: simpleHeadline(title), bullets }
   }
 }
 
@@ -121,6 +142,37 @@ function simpleHeadline(title: string) {
   // Trim long titles, remove source suffix after ' - '
   const t = title.split(' - ')[0]
   return t.length > 100 ? t.slice(0, 97) + '…' : t
+}
+
+function naiveBullets(text: string): string[] {
+  const clean = (text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\W+/, '')
+    .trim()
+  if (!clean) return ['Open the source to read the full article.']
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter((s) => s.length >= 20 && /[a-zA-Z]/.test(s))
+
+  // Score sentences: prefer ones with numbers, %, $, dates, tickers, verbs like rise/fall/beat/miss
+  const scoreSentence = (s: string) => {
+    let score = 0
+    if (/[\$€£]\s?\d/.test(s)) score += 2
+    if (/\d+\s?%/.test(s)) score += 2
+    if (/\b\d{4}\b|\bQ[1-4]\b|\bH[12]\b|\bFY\d{2}\b/i.test(s)) score += 1
+    if (/\b[A-Z]{1,5}\b/.test(s)) score += 1
+    if (/(rise|gain|surge|fall|slump|drop|beat|miss|guidance|forecast|downgrade|upgrade)/i.test(s)) score += 1
+    if (s.length > 160) score += 1
+    return score
+  }
+
+  const scored = sentences.map((s, i) => ({ s, i, score: scoreSentence(s) }))
+  // Pick top 8 by score, then restore original order for readability
+  const top = scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .sort((a, b) => a.i - b.i)
+    .map((x) => x.s)
+
+  return top.length > 0 ? top : sentences.slice(0, 6)
 }
 
 
