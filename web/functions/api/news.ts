@@ -43,6 +43,12 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
         { name: 'MarketWatch', url: 'https://www.marketwatch.com/feeds/topstories' },
         { name: 'Nasdaq', url: 'https://www.nasdaq.com/feed/rssoutbound?category=Stock-Market-News' },
         { name: 'Seeking Alpha', url: 'https://seekingalpha.com/market_currents.xml' },
+        { name: 'Financial Times', url: 'https://www.ft.com/rss/home' },
+        { name: 'TheStreet', url: 'https://www.thestreet.com/.rss/full/' },
+        { name: 'Investing.com', url: 'https://www.investing.com/rss/news.rss' },
+        { name: 'PR Newswire', url: 'https://www.prnewswire.com/rss/all-news.rss' },
+        { name: 'Business Wire', url: 'https://www.businesswire.com/portal/site/home/rss/' },
+        { name: 'SEC', url: 'https://www.sec.gov/news/pressreleases.rss' },
       ]
       // Add a Google News RSS feed: query-specific if q provided; otherwise general stock market
       const gq = q ? q : 'stock market'
@@ -57,7 +63,31 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
           return parsed.slice(0, perSource)
         }),
       )
-      const all = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+      let all = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+
+      // If query contains a ticker-like symbol, enrich with StockTwits posts
+      const mTicker = /\b[A-Z]{1,5}\b/.exec(q || '')
+      if (mTicker) {
+        const sym = mTicker[0]
+        try {
+          const st = await fetchWithTimeout(
+            `https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`,
+            { headers: { 'user-agent': headers['user-agent'] } },
+            4000,
+          )
+          const data = JSON.parse(st)
+          const msgs = (data?.messages || []).slice(0, perSource)
+          const mapped: NewsItem[] = msgs.map((m: any) => ({
+            id: hash(`st_${m.id}`),
+            title: (m?.body || '').slice(0, 140),
+            url: m?.entities?.links?.[0]?.url || `https://stocktwits.com/${m?.user?.username || ''}/message/${m?.id}`,
+            source: 'StockTwits',
+            publishedAt: m?.created_at,
+            description: m?.body || undefined,
+          }))
+          all = all.concat(mapped)
+        } catch {}
+      }
       items = rankAndDedupe(filterStockMarket(all))
       await cache.put(
         cacheKey,

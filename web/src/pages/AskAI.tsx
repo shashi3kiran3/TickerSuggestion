@@ -43,7 +43,6 @@ export default function AskAI() {
 
   return (
     <div className="flex h-[70vh] flex-col rounded-2xl border border-white/10 bg-white/5">
-      <div className="p-3 text-2xl font-bold text-red-400">In Progress</div>
       <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((m) => (
           <div
