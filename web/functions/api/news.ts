@@ -38,20 +38,19 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
     } else {
       const feeds = [
         { name: 'CNBC', url: 'https://www.cnbc.com/id/10001147/device/rss/rss.html' }, // Markets
-        { name: 'Reuters', url: 'https://feeds.reuters.com/reuters/businessNews' },
         { name: 'Yahoo Finance', url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US' },
         { name: 'MarketWatch', url: 'https://www.marketwatch.com/feeds/topstories' },
         { name: 'Nasdaq', url: 'https://www.nasdaq.com/feed/rssoutbound?category=Stock-Market-News' },
         { name: 'Seeking Alpha', url: 'https://seekingalpha.com/market_currents.xml' },
-        { name: 'Financial Times', url: 'https://www.ft.com/rss/home' },
         { name: 'TheStreet', url: 'https://www.thestreet.com/.rss/full/' },
-        { name: 'Investing.com', url: 'https://www.investing.com/rss/news.rss' },
         { name: 'PR Newswire', url: 'https://www.prnewswire.com/rss/all-news.rss' },
         { name: 'Business Wire', url: 'https://www.businesswire.com/portal/site/home/rss/' },
         { name: 'SEC', url: 'https://www.sec.gov/news/pressreleases.rss' },
+        { name: 'Bloomberg US', url: 'https://feeds.bloomberg.com/markets/news.rss' },
+        { name: 'Barron\'s', url: 'https://www.barrons.com/feed' },
       ]
-      // Add a Google News RSS feed: query-specific if q provided; otherwise general stock market
-      const gq = q ? q : 'stock market'
+      // Add a Google News RSS feed: query-specific if q provided; otherwise general US stock market
+      const gq = q ? `${q} US market` : 'US stock market Wall Street'
       feeds.push({
         name: 'Google News',
         url: `https://news.google.com/rss/search?q=${encodeURIComponent(gq)}&hl=en-US&gl=US&ceid=US:en`,
@@ -183,12 +182,25 @@ function dateMs(s?: string) {
 }
 
 function filterStockMarket(items: NewsItem[]): NewsItem[] {
-  // Looser filter: general market and ticker-like words (caps 1–5 letters)
-  const re = /(stock|stocks|share|shares|market|wall street|fed|rates|yields|earnings|guidance|upgrade|downgrade|price target|pre[- ]?market|after[- ]?hours|nasdaq|s&p|dow|ipo|dividend|buyback|sec|fed|treasury|bond)/i
+  // US-focused filter: general market and ticker-like words (caps 1–5 letters)
+  const usMarketTerms = /(stock|stocks|share|shares|market|wall street|fed|rates|yields|earnings|guidance|upgrade|downgrade|price target|pre[- ]?market|after[- ]?hours|nasdaq|s&p|dow|ipo|dividend|buyback|sec|fed|treasury|bond|nyse|amex|otc|us market|american|united states)/i
   const tickerLike = /\b[A-Z]{1,5}\b/
+  
+  // Keywords that indicate non-US news (to filter out)
+  const internationalTerms = /(europe|european|asia|asian|china|chinese|japan|japanese|uk|britain|british|london|frankfurt|tokyo|hong kong|singapore|canada|canadian|australia|australian|india|indian|brazil|brazilian|russia|russian|emerging markets|foreign|overseas|international)/i
+  
   return items.filter((n) => {
     const t = n.title || ''
-    return re.test(t) || tickerLike.test(t)
+    const desc = n.description || ''
+    const fullText = `${t} ${desc}`.toLowerCase()
+    
+    // Skip if it's clearly international news
+    if (internationalTerms.test(fullText)) {
+      return false
+    }
+    
+    // Include if it has US market terms or ticker symbols
+    return usMarketTerms.test(t) || tickerLike.test(t)
   })
 }
 

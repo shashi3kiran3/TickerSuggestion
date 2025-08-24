@@ -18,19 +18,26 @@ export const onRequestGet: PagesFunction<{ ALPHA_VANTAGE_KEY?: string }> = async
       'accept-language': 'en-US,en;q=0.9',
     }
 
-    // Try Yahoo chart first
-    const ep = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol,
-    )}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%2Csplit`
-    const resp = await fetch(ep, { headers })
-    if (resp.ok) {
-      const text = await resp.text()
-      const response = new Response(text, {
-        status: 200,
-        headers: { 'content-type': 'application/json', 'cache-control': 's-maxage=600' },
-      })
-      await cache.put(cacheKey, response.clone())
-      return response
+    // Try Yahoo chart (multiple hosts)
+    const endpoints = [
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(
+        range,
+      )}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%2Csplit`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(
+        range,
+      )}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%2Csplit`,
+    ]
+    for (const ep of endpoints) {
+      const resp = await fetch(ep, { headers })
+      if (resp.ok) {
+        const text = await resp.text()
+        const response = new Response(text, {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'cache-control': 's-maxage=600' },
+        })
+        await cache.put(cacheKey, response.clone())
+        return response
+      }
     }
 
     // Fallback: Alpha Vantage TIME_SERIES_DAILY_ADJUSTED (compact)
