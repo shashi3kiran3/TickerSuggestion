@@ -6,9 +6,11 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
     const url = new URL(request.url)
     const scrIds = url.searchParams.get('scrIds') || 'most_actives'
     const count = url.searchParams.get('count') || '50'
+    const region = url.searchParams.get('region') || 'US'
+    const lang = url.searchParams.get('lang') || 'en-US'
     const yf = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=${encodeURIComponent(
       count,
-    )}&scrIds=${encodeURIComponent(scrIds)}`
+    )}&scrIds=${encodeURIComponent(scrIds)}&region=${encodeURIComponent(region)}&lang=${encodeURIComponent(lang)}`
     const resp = await fetch(yf, { headers: { 'user-agent': 'Mozilla/5.0' } })
     const text = await resp.text()
     return new Response(text, { status: resp.status, headers: { 'content-type': 'application/json' } })

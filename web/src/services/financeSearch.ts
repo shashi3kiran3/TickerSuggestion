@@ -98,50 +98,199 @@ async function stocktwitsSymbol(symbol: string): Promise<NewsItem[]> {
   }
 }
 
+// Enhanced ticker and company name detection
+const COMPANY_TO_TICKER: Record<string, string> = {
+  'apple': 'AAPL',
+  'microsoft': 'MSFT',
+  'google': 'GOOGL',
+  'alphabet': 'GOOGL',
+  'amazon': 'AMZN',
+  'tesla': 'TSLA',
+  'nvidia': 'NVDA',
+  'meta': 'META',
+  'facebook': 'META',
+  'netflix': 'NFLX',
+  'amd': 'AMD',
+  'intel': 'INTC',
+  'coca cola': 'KO',
+  'coca-cola': 'KO',
+  'coke': 'KO',
+  'mcdonalds': 'MCD',
+  'disney': 'DIS',
+  'walt disney': 'DIS',
+  'jpmorgan': 'JPM',
+  'jp morgan': 'JPM',
+  'bank of america': 'BAC',
+  'wells fargo': 'WFC',
+  'goldman sachs': 'GS',
+  'morgan stanley': 'MS',
+  'berkshire hathaway': 'BRK.A',
+  'berkshire': 'BRK.A',
+  'johnson & johnson': 'JNJ',
+  'jnj': 'JNJ',
+  'procter & gamble': 'PG',
+  'p&g': 'PG',
+  'unitedhealth': 'UNH',
+  'united health': 'UNH',
+  'home depot': 'HD',
+  'mastercard': 'MA',
+  'visa': 'V',
+  'paypal': 'PYPL',
+  'salesforce': 'CRM',
+  'oracle': 'ORCL',
+  'cisco': 'CSCO',
+  'adobe': 'ADBE',
+  'nike': 'NKE',
+  'starbucks': 'SBUX',
+  'costco': 'COST',
+  'walmart': 'WMT',
+  'target': 'TGT',
+  'chevron': 'CVX',
+  'exxon': 'XOM',
+  'exxon mobil': 'XOM',
+  'pfizer': 'PFE',
+  'moderna': 'MRNA',
+  'biontech': 'BNTX',
+  'zoom': 'ZM',
+  'palantir': 'PLTR',
+  'snowflake': 'SNOW',
+  'datadog': 'DDOG',
+  'crowdstrike': 'CRWD',
+  'okta': 'OKTA',
+  'shopify': 'SHOP',
+  'square': 'SQ',
+  'block': 'SQ',
+  'robinhood': 'HOOD',
+  'coinbase': 'COIN',
+  'spotify': 'SPOT',
+  'uber': 'UBER',
+  'lyft': 'LYFT',
+  'airbnb': 'ABNB',
+  'doordash': 'DASH',
+  'snap': 'SNAP',
+  'snapchat': 'SNAP',
+  'pinterest': 'PINS',
+  'twitter': 'TWTR',
+  'x': 'TWTR',
+  'linkedin': 'MSFT', // Microsoft owns LinkedIn
+  'github': 'MSFT', // Microsoft owns GitHub
+  'activision': 'ATVI',
+  'blizzard': 'ATVI',
+  'ea': 'EA',
+  'electronic arts': 'EA',
+  'take two': 'TTWO',
+  'take-two': 'TTWO',
+  'rockstar': 'TTWO',
+  'gta': 'TTWO',
+  'federal reserve': 'FED',
+  'fed': 'FED',
+  'powell': 'FED',
+  'jerome powell': 'FED',
+  'fomc': 'FED',
+  'sec': 'SEC',
+  'securities and exchange commission': 'SEC',
+  'treasury': 'TREASURY',
+  'us treasury': 'TREASURY',
+  'yellen': 'TREASURY',
+  'janet yellen': 'TREASURY',
+  'congress': 'CONGRESS',
+  'senate': 'CONGRESS',
+  'house': 'CONGRESS',
+  'white house': 'WHITE_HOUSE',
+  'biden': 'WHITE_HOUSE',
+  'president biden': 'WHITE_HOUSE',
+  'trump': 'TRUMP',
+  'donald trump': 'TRUMP',
+  'president trump': 'TRUMP'
+}
+
+// Enhanced ticker extraction with company name support
 export function extractTickersFromQuery(q: string): string[] {
-  // Heuristic: capture 1–5 letter uppercase tokens and common casings like Tsla → TSLA
+  const query = q.toLowerCase()
+  const tickers = new Set<string>()
+  
+  // Check for company names first
+  for (const [company, ticker] of Object.entries(COMPANY_TO_TICKER)) {
+    if (query.includes(company)) {
+      tickers.add(ticker)
+    }
+  }
+  
+  // Extract traditional ticker symbols (1-5 letter uppercase)
   const candidates = q
     .replace(/[^a-zA-Z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
-  const tickers = new Set<string>()
+  
   for (const w of candidates) {
-    if (/^[A-Za-z]{1,5}$/.test(w)) tickers.add(w.toUpperCase())
+    if (/^[A-Za-z]{1,5}$/.test(w)) {
+      tickers.add(w.toUpperCase())
+    }
   }
-  return Array.from(tickers).slice(0, 3)
+  
+  return Array.from(tickers).slice(0, 5) // Increased limit for better coverage
 }
 
+// Enhanced search with better context detection
 export async function searchFinanceContexts(userQuery: string): Promise<NewsItem[]> {
   const tickers = extractTickersFromQuery(userQuery)
-  const prefersTicker = tickers.length > 0
-  const preferredSites = [
-    'reuters.com',
-    'cnbc.com',
-    'finance.yahoo.com',
-    'marketwatch.com',
-    'bloomberg.com',
-  ]
-  const siteFilter = preferredSites.map((s) => `site:${s}`).join(' OR ')
-  const gQuery = prefersTicker
-    ? `${tickers.join(' OR ')} stock when:1d (${siteFilter})`
-    : `${userQuery} stock when:1d (${siteFilter})`
+  const query = userQuery.toLowerCase()
+  
+  // Detect query type for better source selection
+  const isTickerQuery = tickers.length > 0
+  const isFedQuery = query.includes('powell') || query.includes('fed') || query.includes('fomc') || query.includes('federal reserve')
+  const isEarningsQuery = query.includes('earnings') || query.includes('quarterly') || query.includes('results')
+  const isMarketQuery = query.includes('market') || query.includes('sector') || query.includes('trend')
+  const isEconomicQuery = query.includes('inflation') || query.includes('cpi') || query.includes('jobs') || query.includes('employment')
+  
+  const searches: Promise<NewsItem[]>[] = []
+  
+  if (isTickerQuery) {
+    // For specific tickers, get comprehensive data
+    for (const ticker of tickers.slice(0, 3)) {
+      searches.push(yahooFinanceNews(ticker))
+      searches.push(stocktwitsSymbol(ticker))
+      // Add more ticker-specific sources
+      searches.push(googleNewsSearch(`${ticker} stock news when:1d`))
+    }
+  } else if (isFedQuery) {
+    // For Fed-related queries, focus on financial news
+    searches.push(googleNewsSearch('Federal Reserve Powell speech when:1d'))
+    searches.push(googleNewsSearch('FOMC meeting when:1d'))
+    searches.push(cnbcTop())
+  } else if (isEarningsQuery) {
+    // For earnings queries
+    searches.push(googleNewsSearch('earnings results when:1d'))
+    searches.push(yahooFinanceNews('^GSPC')) // S&P 500 for market context
+  } else if (isMarketQuery) {
+    // For market queries
+    searches.push(googleNewsSearch('stock market today when:1d'))
+    searches.push(cnbcTop())
+    searches.push(yahooFinanceNews('^GSPC'))
+  } else if (isEconomicQuery) {
+    // For economic data
+    searches.push(googleNewsSearch('inflation CPI jobs economic data when:1d'))
+    searches.push(googleNewsSearch('Federal Reserve economic when:1d'))
+  } else {
+    // General finance query
+    const preferredSites = ['reuters.com', 'cnbc.com', 'finance.yahoo.com', 'bloomberg.com']
+    const siteFilter = preferredSites.map((s) => `site:${s}`).join(' OR ')
+    const gQuery = `${userQuery} finance when:1d (${siteFilter})`
+    searches.push(googleNewsSearch(gQuery))
+    searches.push(cnbcTop())
+  }
 
-  const searches: Promise<NewsItem[]>[] = [googleNewsSearch(gQuery)]
-  for (const t of tickers) searches.push(yahooFinanceNews(t), stocktwitsSymbol(t))
-  if (!prefersTicker) searches.push(cnbcTop())
-
+  // Execute searches with timeout
   const results = await Promise.allSettled(searches)
   const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])).filter(Boolean)
 
   const unique = dedupeByUrl(items)
   const ranked = unique
-    .map((n) => ({ news: n, score: scoreNews(n, userQuery, tickers, preferredSites) }))
+    .map((n) => ({ news: n, score: enhancedScoreNews(n, userQuery, tickers, isTickerQuery, isFedQuery) }))
     .sort((a, b) => b.score - a.score)
     .map((x) => x.news)
 
-  // If ticker present, keep only items above a relevance threshold
-  const filtered = prefersTicker ? ranked.filter((n) => scoreNews(n, userQuery, tickers, preferredSites) >= 2) : ranked
-  return filtered.slice(0, 20)
+  return ranked.slice(0, 12) // Increased for better coverage
 }
 
 function dedupeByUrl(items: NewsItem[]): NewsItem[] {
@@ -156,21 +305,43 @@ function dedupeByUrl(items: NewsItem[]): NewsItem[] {
   return out
 }
 
-function scoreNews(item: NewsItem, userQuery: string, tickers: string[], preferredSites: string[]): number {
+// Enhanced scoring for better relevance
+function enhancedScoreNews(
+  item: NewsItem, 
+  userQuery: string, 
+  tickers: string[], 
+  isTickerQuery: boolean,
+  isFedQuery: boolean
+): number {
   let score = 0
   const title = (item.title || '').toUpperCase()
-  for (const t of tickers) if (title.includes(t)) score += 3
-  const uq = userQuery.toUpperCase()
-  if (uq.includes('TREND') && /TREND|RALLY|GAIN|SURGE|MOMENTUM/i.test(title)) score += 1
-  if (/STOCK|SHARE|EARNINGS|GUIDANCE|OUTLOOK|PRICE|UPGRADE|DOWNGRADE/i.test(title)) score += 1
-  if (preferredSites.some((s) => item.url.includes(s))) score += 1
-  // recency heuristic
+  const query = userQuery.toUpperCase()
+  
+  // Ticker-specific scoring
+  for (const t of tickers) {
+    if (title.includes(t)) score += 5
+  }
+  
+  // Query-specific scoring
+  if (isTickerQuery && /STOCK|SHARE|PRICE|TRADING|VOLUME/i.test(title)) score += 3
+  if (isFedQuery && /FED|FEDERAL|POWELL|FOMC|RATE|INTEREST/i.test(title)) score += 4
+  if (query.includes('EARNINGS') && /EARNINGS|QUARTERLY|RESULTS|REVENUE|PROFIT/i.test(title)) score += 3
+  if (query.includes('MARKET') && /MARKET|SECTOR|INDEX|TREND/i.test(title)) score += 2
+  if (query.includes('INFLATION') && /INFLATION|CPI|PRICE|ECONOMIC/i.test(title)) score += 3
+  
+  // Source preference
+  const preferredSources = ['reuters.com', 'cnbc.com', 'finance.yahoo.com', 'bloomberg.com', 'marketwatch.com']
+  if (preferredSources.some((s) => item.url.includes(s))) score += 2
+  
+  // Recency scoring
   const ts = item.publishedAt ? Date.parse(item.publishedAt) : NaN
   if (!Number.isNaN(ts)) {
     const hrs = (Date.now() - ts) / 36e5
-    if (hrs <= 24) score += 2
-    else if (hrs <= 72) score += 1
+    if (hrs <= 6) score += 4
+    else if (hrs <= 24) score += 3
+    else if (hrs <= 72) score += 2
   }
+  
   return score
 }
 
@@ -178,7 +349,7 @@ export async function fetchArticleText(url: string): Promise<string> {
   // Use Jina reader for robust readability with CORS bypass
   const reader = `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`
   const txt = await fetchText(reader)
-  return txt.slice(0, 8000) // bound context size
+  return txt.slice(0, 4000) // Reduced context size for faster processing
 }
 
 

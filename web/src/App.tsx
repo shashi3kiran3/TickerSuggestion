@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import RootLayout from './layouts/RootLayout.tsx'
 import Home from './pages/Home.tsx'
+import Dashboard from './pages/Dashboard.tsx'
 import Suggestions from './pages/Suggestions.tsx'
 import News from './pages/News.tsx'
 import Events from './pages/Events.tsx'
@@ -14,8 +15,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<RootLayout />}> 
-          <Route index element={<Home />} />
-          <Route path="home" element={<Navigate to="/" replace />} />
+          <Route index element={<Dashboard />} />
+          <Route path="home" element={<Home />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="suggestions" element={<Suggestions />} />
           <Route path="news" element={<News />} />
           <Route path="events" element={<Events />} />

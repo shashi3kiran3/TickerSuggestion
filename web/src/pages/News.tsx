@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { type NewsCard, timeAgo } from '../services/news'
 import { summarizeNewsArticle, type NewsSummary } from '../services/openai'
+import NewsLoading from '../components/NewsLoading'
 
 export default function News() {
   const [all, setAll] = useState<NewsCard[]>([])
@@ -19,11 +20,49 @@ export default function News() {
     params.set('pageSize', '50')
     if (source && source !== 'All') params.set('source', source)
     if (q.trim()) params.set('q', q.trim())
-    fetch(`/api/news?${params.toString()}`)
-      .then((r) => r.json())
-      .then((d) => (Array.isArray(d.items) ? d.items : []))
+    
+    console.log('Loading news with params:', params.toString())
+    
+    // Add timeout to prevent infinite loading
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    
+    fetch(`/api/news?${params.toString()}`, { signal: controller.signal })
+      .then((r) => {
+        console.log('News API response status:', r.status)
+        if (!r.ok) {
+          throw new Error(`HTTP error! status: ${r.status}`)
+        }
+        return r.json()
+      })
+      .then((d) => {
+        console.log('News API response:', d)
+        const items = Array.isArray(d.items) ? d.items : []
+        console.log('Parsed news items:', items.length)
+        return items
+      })
       .then(setAll)
-      .finally(() => setLoading(false))
+      .catch((error) => {
+        console.error('Error loading news:', error)
+        // Fallback: try a simpler request
+        console.log('Trying fallback news request...')
+        fetch('/api/news?page=1&pageSize=10')
+          .then((r) => r.json())
+          .then((d) => {
+            const items = Array.isArray(d.items) ? d.items : []
+            console.log('Fallback news items:', items.length)
+            setAll(items)
+          })
+          .catch((fallbackError) => {
+            console.error('Fallback also failed:', fallbackError)
+            setAll([])
+          })
+      })
+      .finally(() => {
+        console.log('News loading completed')
+        clearTimeout(timeoutId)
+        setLoading(false)
+      })
   }
 
   useEffect(() => {
@@ -55,6 +94,15 @@ export default function News() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Financial News</h1>
+          <div className="text-sm text-gray-400">
+            Latest market headlines and financial updates
+          </div>
+        </div>
+      </div>
+      
       <form
         className="flex flex-wrap items-center gap-3"
         onSubmit={(e) => {
@@ -88,7 +136,7 @@ export default function News() {
       </form>
 
       {loading ? (
-        <div className="text-sm text-gray-300">Loading latest finance headlines…</div>
+        <NewsLoading />
       ) : (
         <div className="space-y-3">
           {filtered.slice(0, visible).map((a) => (
